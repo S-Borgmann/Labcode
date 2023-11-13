@@ -11,11 +11,6 @@ knit: (function(input_file, encoding) {
       output_file='index.html')})
 ---
 
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
 ## Creating a simple code to learn about mixed models
 
 First I am creating a simple plot to show the uniform study design
