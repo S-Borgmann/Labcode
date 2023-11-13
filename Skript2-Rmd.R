@@ -1,0 +1,79 @@
+---
+  title: "Uniform vs Hierarchical Study design"
+author: "Ruben J, Hermann"
+date: "`r Sys.Date()`"
+output: html_document
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+                    encoding=encoding,
+                    output_dir=file.path(dirname(input_file), out_dir),
+                    output_file='index.html')})
+---
+  
+  ## Creating a simple code to learn about mixed models
+  
+  First I am creating a simple plot to show the uniform study design
+
+```{r}
+x_cord <- 1:10
+y_cord <- 1:10
+d <- expand.grid(x_cord,y_cord)
+plot(d,pch=19,col="black",cex=2,xlab="x-position (longitude)",ylab="y-position (latitude)"
+     ,main="Uniform residual variance")
+
+```
+
+This is the plot to show the hierarchical study design
+
+```{r}
+
+patches <-c("black","maroon4","midnightblue","firebrick1","darkorchid4",
+            "coral3","khaki1","gray47","mediumspringgreen","cyan3")
+
+plot(d,pch=19,col=patches,cex=2,xlab="x-position (longitude)",ylab="y-position (latitude)"
+     ,main="Hierarchical study design")
+```
+
+These are the data for the uniform data design --> epsilon is for all sample units from the
+same distribution $\varepsilon \sim N(0,1)$
+  
+  --> there are some mistakes on the epsilon as the error is from a normal distribuiton I don't
+have integers anymore which are needed for count measurements
+
+```{r}
+n = 100
+set.seed(7)
+x = rnorm(n)
+sample.id = 1:n
+beta1 = 0
+beta2 = 1
+sigma = 1
+L = beta1 + beta2*x
+L_link = rpois(n,exp(L))
+y = rpois(n,exp(L+ rnorm(n, sd=sigma))) 
+data <- data.frame(sampling_unit=sample.id,covariate=x,counts=y,predictor=L,predictor_pois=L_link)
+plot(x,y,xlab="Covariate",ylab="Counts"
+     ,main="Uniform design")
+```
+
+These are the data for the hierarchical data design --> epsilon is part of two distributions
+1. the same error distributions for all sampling units as above $\varepsilon \sim N(0,1)$
+2. the added variance of the plot-level effects $a_p \sim N(0,\sigma^2_P)$
+as such we have $\epsilon_i = \varepsilon_i + a_{p(i)}$
+
+```{r}
+n = 100
+L = beta1 + beta2*x
+L_link = rpois(n,exp(L))
+np = 10
+plot.id = c(rep(1:10,10))
+sigma.plot = 1
+ap = rnorm(np, sd = sigma.plot)
+a = ap[plot.id]
+y = rpois(n,exp(L+ a + rnorm(n, sd = sigma))) 
+plot.id = as.factor(plot.id)
+data2 <- data.frame(sampling_unit=sample.id,plots=plot.id,covariate=x,counts=y,predictor=L,plot_effect=a,predictor_pois=L_link)
+plot(x,y,col = plot.id, las = 1,xlab="Covariate",ylab="Counts"
+     ,main="Hierarchical study design")
+```
