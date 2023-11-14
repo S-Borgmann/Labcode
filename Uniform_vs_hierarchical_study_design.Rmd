@@ -50,9 +50,8 @@ beta1 = 0
 beta2 = 1
 sigma = 1
 L = beta1 + beta2*x
-L_link = rpois(n,exp(L))
-y = rpois(n,exp(L+ rnorm(n, sd=sigma))) 
-data <- data.frame(sampling_unit=sample.id,covariate=x,counts=y,predictor=L,predictor_pois=L_link)
+y = L + rnorm(n, sd = sigma)
+data <- data.frame(sampling_unit=sample.id,covariate=x,counts=y,predictor=L)
 plot(x,y,xlab="Covariate",ylab="Counts"
      ,main="Uniform design")
 ```
@@ -65,15 +64,14 @@ as such we have $\epsilon_i = \varepsilon_i + a_{p(i)}$
 ```{r}
 n = 100
 L = beta1 + beta2*x
-L_link = rpois(n,exp(L))
 np = 10
 plot.id = c(rep(1:10,10))
 sigma.plot = 1
 ap = rnorm(np, sd = sigma.plot)
 a = ap[plot.id]
-y = rpois(n,exp(L+ a + rnorm(n, sd = sigma))) 
+y = L + a + rnorm(n, sd = sigma)
 plot.id = as.factor(plot.id)
-data2 <- data.frame(sampling_unit=sample.id,plots=plot.id,covariate=x,counts=y,predictor=L,plot_effect=a,predictor_pois=L_link)
+data2 <- data.frame(sampling_unit=sample.id,plots=plot.id,covariate=x,counts=y,predictor=L,plot_effect=a)
 plot(x,y,col = plot.id, las = 1,xlab="Covariate",ylab="Counts"
      ,main="Hierarchical study design")
 ```
