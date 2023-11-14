@@ -1,8 +1,0 @@
-name: "main"
-output_dir: "docs"
-navbar:
-title: "Uniform vs Hierarchical Study design"
-href: Uniform_vs_hierarchical_study_design.html
-output:
-html_document:
-theme: cosmo
