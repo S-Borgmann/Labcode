@@ -37,9 +37,6 @@ plot(d,pch=19,col=patches,cex=2,xlab="x-position (longitude)",ylab="y-position (
 These are the data for the uniform data design --> epsilon is for all sample units from the
 same distribution $\varepsilon \sim N(0,1)$
 
---> there are some mistakes on the epsilon as the error is from a normal distribuiton I don't
-have integers anymore which are needed for count measurements
-
 ```{r}
 n = 100
 set.seed(7)
