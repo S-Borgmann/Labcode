@@ -10,6 +10,12 @@ knit: (function(input_file, encoding) {
       output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pander)
+library(MASS)
+```
+
 ## Creating a simple code to learn about mixed models
 
 First I am creating a simple plot to show the uniform study design
@@ -71,3 +77,122 @@ data2 <- data.frame(sampling_unit=sample.id,plots=plot.id,covariate=x,counts=y,p
 plot(x,y,col = plot.id, las = 1,xlab="Covariate",ylab="Counts"
      ,main="Hierarchical study design")
 ```
+
+## Code to better understand non-heirarchical and heirarchical errors
+
+I model here the abundance / population size (`y`) of a single species in the uniform landscape pictured above, at each site `i`. The average population size is $\alpha = \beta_1 = 450$, but also varies depending on the local site's value of the environmental covariate $x_i$, as well as unstructured (non-hierarchical) error (unexplained variation in population size) $\epsilon_i$. I include an impact of $\beta = \beta_2 = 1.23$ - for each unit change in *x*, there is a corresponding increase by 1.23 of *y*.
+
+```{r}
+n <- 100
+x1 <- rep(1,n)
+x2 <- x
+beta1 <- 450
+beta2 <- 1.23
+L <- beta1*x1 + beta2*x2
+```
+
+Currently, the population size values follow perfectly the expectation given by the impact of *x* on *y*:
+
+```{r}
+plot(x,L,main="Impact of environment x on population size Y at site i",ylab="yi")
+```
+
+However, each sampling site has some unexplained error, or some unexplained deviation from the average population size after taking the environmental covariate *x* into account. We still hypothesize / state that the population size values are drawn from a single, shared distribution, with a shared center $L_i$ and a shared variance $\sigma^2$. The response variable cannot be expected be fully predicted by the explanatory variable, and there will be residuals. The residual variation is assumed to be normally distributed, as $\epsilon_i \sim N(0,\sigma^2)$, where $\sigma$ is the standard deviation.
+
+```{r,out.width="50%"}
+sigma <- 0.25
+e <- rnorm(n,0,sigma)
+y <- L + e
+hist(e)
+plot(x,y,main="Impact of environment x on population size Y at site i",ylab="yi")
+```
+
+We can use R's `lm` to fit a linear model to this data - we imagine we are researchers collecting data, and we do not know the impact of environmental covariate *x* on population size *y*.
+
+```{r}
+mod_lm <- lm(y ~ x2)
+summary(mod_lm)
+```
+
+And we can see that fitting a linear model does a good job at estimating the parameters in our model $\alpha = \beta_1$, $\beta = \beta_2$, and $\epsilon$:
+
+```{r}
+pander::pander(summary(mod_lm))
+pander::pander(anova(mod_lm))
+```
+
+The estimate for the intercept $\alpha = \beta_1$ is `r coef(summary(mod_lm))[1,1]` ± `r coef(summary(mod_lm))[1,2]`, the estimate for $\beta = \beta_2$ is `r coef(summary(mod_lm))[2,1]` ± `r coef(summary(mod_lm))[2,2]`, and the estimate for $\sigma$ is `r summary(mod_lm)$sigma`.
+
+We can also consider this using HMSC:
+
+```{r}
+## Will insert code here to run the analysis above using HMSC
+```
+
+Next, we can consider there is spatial structure in the residuals - as discussed above, we now consider a hierarchical study design where multiple sampling units have been surveyed within a higher hierarchical level of plot. We expect that the data points from within the same plot are more similar than the data points originating from different plots, and therefore that their residuals are positively correlated within plots.
+
+In the 1st example:
+
+$$ y_i = \alpha + \beta x_i + \epsilon_i $$
+
+Which can also be written as:
+
+$$ y_i = \sum^{n_c}_{k=1}x_ik \beta_k + \epsilon_i $$
+if $\alpha = \beta_1$, $x_{i1} = 1$ for all sampling units *i*, and $\beta = \beta_2$
+
+A third way to write the equation is:
+
+$$ y_i \sim N(L_i,\sigma^2) $$
+$$ L_i = \sum^{n_c}_{k=1} x_{ik} \beta_k $$
+
+In the 2nd example, a plot-level random effect is entered that introduces dependency structure of errors. Data points originating from the same plot are more similar than the data points originating from different plots, and thus residuals within the same plot are expected to be positively correlated.
+
+Ruben implemented this using:
+
+$$ y_i = L_i + a_{p(i)} + \epsilon_i $$
+$$ a_{p(i)} \sim N(0,\sigma^2_p) $$
+$$ \epsilon_i \sim N(0,\sigma^2) $$
+For Ruben's example, the within-plot variance for each of the 10 plots $\sigma_p$ = [`r ap`]. We can literally see in his code that he followed this equation:
+
+```{r, eval=FALSE}
+n = 100
+L = beta1 + beta2*x
+np = 10
+plot.id = c(rep(1:10,10))
+sigma.plot = 1
+ap = rnorm(np, sd = sigma.plot)
+a = ap[plot.id]
+y = L + a + rnorm(n, sd = sigma) # This corresponds to the yi formula above
+```
+
+Our JDSM CHapter 5 text tells us another way of writing this equation (5.7 in the text), using the *multivariate normal distribution* for descrobing the distribution of response variables $y_i$ for all sampling units *i* - we denote by $\mathbf{y}$ the vector of length *n* (number of sampling units) with all of the values of $y_i$, we denote by $\mathbf{L}$ the vector of all linear predictors $L_i$, and by $\mathbf{\epsilon}$ the vector of all residuals $\epsilon_i$. We can then rewrite the equation as:
+
+$$ \mathbf{y} \sim \mathbf{L} + \epsilon_i$$
+$$ \epsilon_i \sim N(\mathbf{0},\mathbf{\Sigma}) $$
+
+Where $N(\mathbf{\mu},\mathbf{\Sigma})$ stands for the multivariate normal distribution with mean $\mathbf{\mu}$ and variance-covariance matrix $\mathbf{\Sigma}$. In this equation above, the vector $\mathbf{\mu}$ is set to 0 because the expectation of each $\epsilon_i$ value is 0. The diagonal elements of the variance-covariance matrix $\mathbf{\Sigma}$ model the variances, and thus are set to $\Sigma_{ii} = \sigma^2_p + \sigma^2$. The off-diagonal elements of the variance-covariance matrix $\mathbf{\Sigma}$ model the covariances, and here are set to $\Sigma_{ij} = \sigma^2_p$ if the sampling units *i* and *j* belong to the same plot, and $\Sigma_{ij} = 0$ if the sampling units *i* and *j* belong different plots.
+
+For the example we look at so far, this variance-covariance matrix looks like this:
+
+```{r, eval=FALSE}
+# create sample data
+Sigma <- matrix(rep(0,10),nrow=10,ncol=10)
+diag(Sigma) <- ap + sigma
+Sigma[upper.tri(Sigma)] <- sigma
+Sigma[lower.tri(Sigma)] <- sigma
+#Sigma <- lqmm::make.positive.definite(Sigma, tol=1e-3)
+## this needs to be changed so that the off-diagonals not in the same plot are set to zero ##
+## and the command below does not work
+#var(MASS::mvrnorm(1, 1:10, Sigma))
+```
+
+
+
+
+
+
+
+
+
+
+
