@@ -1,6 +1,6 @@
 ---
 title: "Uniform vs Hierarchical Study design"
-author: "Ruben J, Hermann"
+author: "AG Pantel"
 date: "`r Sys.Date()`"
 output: html_document
 knit: (function(input_file, encoding) {
