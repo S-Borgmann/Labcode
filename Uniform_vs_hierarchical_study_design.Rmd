@@ -177,13 +177,13 @@ For the example we look at so far, this variance-covariance matrix looks like th
 ```{r, eval=FALSE}
 # create sample data
 Sigma <- matrix(rep(0,10),nrow=10,ncol=10)
-diag(Sigma) <- ap + sigma
-Sigma[upper.tri(Sigma)] <- sigma
-Sigma[lower.tri(Sigma)] <- sigma
+diag(Sigma) <- sigma.plot + sigma
+Sigma[upper.tri(Sigma)] <- 0
+Sigma[lower.tri(Sigma)] <- 0
 Sigma <- lqmm::make.positive.definite(Sigma, tol=1e-3)
 ## this needs to be changed so that the off-diagonals not in the same plot are set to zero ##
 ## and the command below does not work
-var(MASS::mvrnorm(1, 1:10, Sigma))
+var(MASS::mvrnorm(n=1, mu=c(rep(0,10)), Sigma=Sigma)) # I just changed the syntax a little and also put 0 for mu, but I still need to figure out how multivariate normal distribution really functions. So this was a first attempt to do so. 
 ```
 
 
