@@ -44,9 +44,9 @@ These are the data for the uniform data design --> epsilon is for all sample uni
 same distribution $\varepsilon \sim N(0,1)$
 
 ```{r}
-n = 100
-set.seed(7)
-x = rnorm(n)
+n = 100 #sampling sides
+set.seed(7) 
+x = rnorm(n) 
 sample.id = 1:n
 beta1 = 0
 beta2 = 1
@@ -177,14 +177,17 @@ For the example we look at so far, this variance-covariance matrix looks like th
 ```{r, eval=FALSE}
 # create sample data
 Sigma <- matrix(rep(0,10),nrow=10,ncol=10)
-diag(Sigma) <- ap + sigma
-Sigma[upper.tri(Sigma)] <- sigma
-Sigma[lower.tri(Sigma)] <- sigma
-#Sigma <- lqmm::make.positive.definite(Sigma, tol=1e-3)
+diag(Sigma) <- sigma.plot + sigma
+Sigma[upper.tri(Sigma)] <- 0
+Sigma[lower.tri(Sigma)] <- 0
+Sigma <- lqmm::make.positive.definite(Sigma, tol=1e-3)
 ## this needs to be changed so that the off-diagonals not in the same plot are set to zero ##
 ## and the command below does not work
-#var(MASS::mvrnorm(1, 1:10, Sigma))
+var(MASS::mvrnorm(n=1, mu=c(rep(0,10)), Sigma=Sigma)) # I just changed the syntax a little and also put 0 for mu, but I still need to figure out how multivariate normal distribution really functions. So this was a first attempt to do so. 
 ```
+
+
+
 
 
 
