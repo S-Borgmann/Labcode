@@ -14,6 +14,10 @@ knit: (function(input_file, encoding) {
 knitr::opts_chunk$set(echo = TRUE)
 library(pander)
 library(MASS)
+library(Hmsc)
+library(RColorBrewer)
+library(lme4)
+library(mixedup)
 ```
 
 ## Creating a simple code to learn about mixed models
@@ -186,16 +190,269 @@ Sigma <- lqmm::make.positive.definite(Sigma, tol=1e-3)
 var(MASS::mvrnorm(n=1, mu=c(rep(0,10)), Sigma=Sigma)) # I just changed the syntax a little and also put 0 for mu, but I still need to figure out how multivariate normal distribution really functions. So this was a first attempt to do so. 
 ```
 
+## 1A. Linear model, single species
 
+HMSC (Vignette 1) simulate univariate data, which represents population size `n` of a single species sampled at $i$ = 50 sampling units, each of which has a distinct value for an environmental covariate $x_i$. The data is simulated by the standard linear model with normally distributed residuals:
 
+\begin{align}
+y_i = \alpha + \beta x_i + \epsilon_i
+\end{align}
 
+where $\epsilon_i \sim N(0,\sigma^2)$
 
+This can be alternatively written as:
 
+\begin{align}
+y_i = \sum^{n_c}_{k=1} x_{ik} \beta_k + \epsilon_i
+\end{align}
 
+Where the number of covariates is $n_c -1$, $\beta_1$ is the intercept term ($\alpha$) and $x_{i1} = 1$. We can also write this equation as:
 
+\begin{align}
+y_i \sim N(L_i,\sigma^2)
+\end{align}
 
+Where $L_i$ is called the linear predictor:
 
+\begin{align}
+L_i = \sum^{n_c}_{k=1} x_{ik}\beta_k
+\end{align}
 
+And `n` is the number of data points, `x` is a continuous covariate, `alpha` and `beta` are the true parameters for intercept and slope, `L` is the linear predictor, and `y` is the response variable (population size).
 
+```{r out.width="40%"}
+set.seed(1)
+n = 50
+x = rnorm(n)
+alpha = 0
+beta = 1
+sigma = 1
+L = alpha + beta*x
+y = L + rnorm(n, sd = sigma)
+plot(x, y, las=1)
+```
+This data is analyzed via HMSC as follows:
 
+```{r out.width="70%",warning=FALSE,message=FALSE,results='hide',fig.keep='all'}
+Y = as.matrix(y)
+XData = data.frame(x = x)
+m = Hmsc(Y = Y, XData = XData, XFormula = ~x)
+# MCMC parameters
+nChains = 2
+thin = 5
+samples = 1000
+transient = 500*thin
+verbose = 500*thin
 
+m = sampleMcmc(m, thin = thin, samples = samples, transient = transient, nChains = 2, verbose = verbose)
+
+# Interpret results
+m.post = Hmsc::convertToCodaObject(m)
+m.df <- as.data.frame(rbind(m.post$Beta[[1]],m.post$Beta[[2]]))
+bayesplot::mcmc_areas(m.df)
+summary(m.post$Beta)
+plot(m.post$Beta)
+preds = computePredictedValues(m)
+evaluateModelFit(hM=m, predY=preds)
+preds.mean = apply(preds, FUN=mean, MARGIN=1)
+nres = scale(y-preds.mean)
+par(mfrow=c(1,2))
+hist(nres, las = 1)
+plot(preds.mean,nres, las = 1)
+abline(a=0,b=0)
+```
+
+## 1B. Linear mixed model, single species, spatial (heirarcahical) study design
+
+We now consider a population growing, where the species abundance is sampled from sites that are nested within plots. In such a case, two observations from the same plot are likely to be more similar to each other than two observations indifferent plots. We now introduce residuals for observations $y_i$ that are not independent of one another, and introduce into the statistical model a plot-level random effect.
+
+As indicated in Ovaskainen & Abrego (Chapter 5), a standard way of implementing this dependency structure into the model is to add a plot-level random effect. To do so we use $a_p$ to denote the effect of plot $p$. The random effects are assumed to be normally distributed, so that $$ a_p \sim N(0,\sigma^2_p) $$, where $$ \sigma^2_p $$ is the variance in the plot-level effects. Right now, this suggests that in addition to the residual variance $\epsilon_i$, each data point also has residual variance associated with the sampling plot $a_p$. We can now extend the basic linear model into a mixed model:
+
+$$ y_i = L_i + a_{p(i)} + \epsilon_i $$
+$$ a_{p(i)} \sim N(0,\sigma^2_p) $$
+$$ \epsilon_i \sim N(0,\sigma^2) $$
+This is called a *mixed model* because it includes both fixed effects, i.e. the regression parameters included in the linear predictor $L_i$, as well as random effects, i.e. the effect of sampling date.
+
+JDSM Chapter 5 text tells us another way of writing this equation (5.7 in the text), using the *multivariate normal distribution* for describing the distribution of response variables $y_i$ for all sampling units *i* - we denote by $\mathbf{y}$ the vector of length *n* (number of sampling units) with all of the values of $y_i$, we denote by $\mathbf{L}$ the vector of all linear predictors $L_i$, and by $\mathbf{\epsilon}$ the vector of all residuals $\epsilon_i$. We can then rewrite the equation as:
+
+$$ \mathbf{y} \sim \mathbf{L} + \epsilon_i$$
+$$ \epsilon_i \sim N(\mathbf{0},\mathbf{\Sigma}) $$
+
+Where $N(\mathbf{\mu},\mathbf{\Sigma})$ stands for the multivariate normal distribution with mean $\mathbf{\mu}$ and variance-covariance matrix $\mathbf{\Sigma}$. We can also write out what this looks like for this example so far:
+
+$$\begin{bmatrix} y_1\\
+y_2\\
+y_{...}\\
+y_i
+\end{bmatrix} = \begin{bmatrix}\beta_1 x_1\\
+\beta_2 x_2\\
+\end{bmatrix} \begin{bmatrix}\epsilon_1\\
+\epsilon_2\\
+\epsilon_{...}\\
+\epsilon_i
+\end{bmatrix}$$
+
+In this equation above, the vector $\mathbf{\mu}$ is set to 0 because the expectation of each $\epsilon_i$ value is 0.
+
+The diagonal elements of the variance-covariance matrix $\mathbf{\Sigma}$ model the variances, and thus are set to $\Sigma_{ii} = \sigma^2_p + \sigma^2$. The off-diagonal elements of the variance-covariance matrix $\mathbf{\Sigma}$ model the covariances, and here are set to $\Sigma_{ij} = \sigma^2_p$ if the sampling units *i* and *j* belong to the same plot, and $\Sigma_{ij} = 0$ if the sampling units *i* and *j* belong to different plots.
+
+Before going back to the example shown above, I first visualize a variance-covariance matrix with $\sigma^2 = 4$ and $\sigma_p^2 = 0.8$. I then simulate draws from that variance-covariance matrix, for n=50 'sampling units' (observations) taken across 5 plots. Only samples collected from the same plot covary (to continue with this example using the logic from JDSM):
+
+```{r}
+samp <- rep(1:5,each=10)
+sig <- 4
+ap <- 0.8
+m<-matrix(rep(NA,2500),ncol=50)
+for(i in 1:50){
+    for(j in 1:50){
+       if(samp[i]==samp[j]){
+           m[i,j] <- sig
+           }
+       else{
+           m[i,j] <- 0
+       }
+    }
+}
+m <- as.matrix(m)
+diag(m) <- ap + sig
+```
+
+For the example above, this variance-covariance matrix looks like this:
+
+```{r echo=FALSE,results='asis',out.width="60%",warning=FALSE,message=FALSE}
+kableExtra::kable_styling(knitr::kable(m,"html"),font_size = 7,position = "left",stripe_color = "gray!15",bootstrap_options = c("condensed"))
+
+heatmap(m,Rowv=NA,Colv=NA,revC=TRUE,col=colorRampPalette(RColorBrewer::brewer.pal(8, "Blues"))(25))
+legend(x="bottomright", legend=c("0", "covar", "var"), bty="n", cex=0.7, fill=colorRampPalette(RColorBrewer::brewer.pal(8, "Blues"))(3))
+```
+
+This example represents 50 total sites / sampling units (i = 1:50), and some sites / sampling units were sampled from shared plots (p = 1:5). As we can see from the image, data points $y_1$:$y_{10}$ are from sites 1-10 sampled in Plot 1. Data points $y_{11}$:$y_{20}$ are from sites 11-20 sampled in Plot 2, data points $y_{21}$:$y_{30}$ are from sites 21-30 sampled in Plot 3, data points $y_{31}$:$y_{40}$ are from sites 31-40 sampled in Plot 4, and data points $y_{41}$:$y_{50}$ are from sites 41-50 sampled in Plot 5. In the example pictured, each site has the same sample variance $\sigma^2 = 4$ and also each sampling day has the same within-day covariance $\sigma_t^2 = 0.8$. We now look at how to draw residuals from the multivariate normal distribution using the command `MASS::mvrnorm`:
+
+```{r}
+# 2 heirarchical groups: mean [0 2], variance [10 2], covariance [3]. Draw for 10 points from each group.
+Sigma <- matrix(c(10,3,3,2),2,2)
+Sigma
+blah <- MASS::mvrnorm(n = 100, c(0,2), Sigma)
+var(blah)
+```
+
+Now we can draw the residuals $\epsilon_i$ for our hypothetical 50 sites sampled across 5 plots this way:
+
+```{r}
+# 5 heirarchical groups: mean [0 0 0 0 0 0 0 0 0 0]; variance: [4.8 4.8 4.8 4.8 4.8 4.8 4.8 4.8 4.8 4.8 4.8]; covariance: see matrix above. Draw for 1 point from each group.
+resid <-  MASS::mvrnorm(1, rep(0,50), m)
+```
+
+Putting it all together - we now attempt to sample data points that represent population size `n` of a single species sampled at `i= 50` sampling units, each of which has a distinct value for an environmental covariate $x_i$. Each of the sampling units was sampled in one of 5 plots (as above), meaning that we need to consider not only variance but also covariance between sampling unit values sampled in the same plot. Our model becomes:
+
+$$ y_i = L_i + a_{p(i)} + \epsilon_i $$
+$$ L_i = \sum^{n_c}_{k=1} x_{ik} \beta_k $$
+$$ a_{p(i)} \sim N(0,\sigma^2_p) $$
+$$ \epsilon_i \sim N(0,\sigma^2) $$
+
+For this example:
+
++ $L_i$ - I use environmental values $e \sim N(0,1)$ for $i = 50$ sites / sampling units, $\beta_1 = 450$ and $x_{ik} = 1$, $\beta_2 = 1.23$
+
++ $\sigma_{p}^2$ = [0.25 0.35 0.23 0.05 0.1] for `p = 1:5`
+
++ $\sigma^2 = 0.7$
+
+```{r,out.width="50%"}
+n <- 50
+x <- rnorm(n)
+x1 <- rep(1,n)
+x2 <- x
+beta1 <- 450
+beta2 <- 1.23
+L <- beta1*x1 + beta2*x2
+
+## Method 1 of drawing residual values
+n.plot <- rep(1:5,each=10)
+sigma.plot <- c(0.25,0.35,0.23,0.05,0.1)
+ap <- rep(NA,n)
+for(i in 1:n){
+  ap[i] <- rnorm(1,0,sd = sigma.plot[n.plot[i]])
+}
+y <- L + ap + rnorm(n, sd=0.7)
+plot(x,L,main="Impact of environment x on population size Y at site i",ylab="yi")
+plot(x,y,main="Impact of environment x on population size Y at site i",ylab="yi")
+# colored by day
+cols = rainbow(5)
+plot(x, y, col = cols[n.plot], las = 1, main="Impact of environment x on population size Y at site i",ylab="yi")
+for (p in 1:5){
+abline(beta1+ap[p], beta2, col = cols[p]) }
+```
+
+This data is analyzed via mixed models as follows:
+
+```{r}
+n.plot <- as.factor(n.plot)
+# random intercepts only
+mod <- lme4::lmer(y ~ x + (1 | n.plot))
+# random intercepts and slopes
+#mod <- lme4::lmer(y ~ x + (1 + x | n.plot))
+summary(mod)
+mixedup::extract_random_effects(mod)
+lme4::ranef(mod)$n.plot
+
+# Complicated.
+var.d <- crossprod(getME(mod,"Lambdat"))
+Zt <- getME(mod,"Zt")
+vr <- sigma(mod)^2
+var.b <- vr*(t(Zt) %*% var.d %*% Zt)
+sI <- vr * Diagonal(length(x))
+var.y <- var.b + sI
+m <- as.matrix(var.y)
+
+kableExtra::kable_styling(knitr::kable(m,"html"),font_size = 7,position = "left",stripe_color = "gray!15",bootstrap_options = c("condensed"))
+
+heatmap(m,Rowv=NA,Colv=NA,revC=TRUE,col=colorRampPalette(RColorBrewer::brewer.pal(8, "Blues"))(25))
+legend(x="bottomright", legend=c("0", "covar", "var"), bty="n", cex=0.7, fill=colorRampPalette(RColorBrewer::brewer.pal(8, "Blues"))(3))
+
+```
+
+How to interpret this? What are the estimates of the effects of site / sampling values collected from the same plot? We can see the estimates are poor. These are the estimates of the variance for the plot effect, telling us how much *y* varies among sampling units sampled within the same plot - the solvers are not designed to estimate these, but instead to consider them for the fixed effect estimates. Fin.
+
+This data is analyzed via HMSC as follows:
+
+```{r out.width="70%"}
+plot.id = as.factor(n.plot)
+sample.id = as.factor(1:n)
+XData = data.frame(x = x)
+Y = as.matrix(y)
+studyDesign = data.frame(sample = sample.id, plot = plot.id)
+rL = HmscRandomLevel(units = studyDesign$plot)
+m2 = Hmsc(Y = Y, XData = XData, XFormula = ~x, studyDesign = studyDesign, ranLevels = list('plot' = rL))
+
+thin = 5
+samples = 5000
+transient = 1000*thin
+m2 = sampleMcmc(m2, thin = thin, samples = samples, transient = transient, nChains = nChains, verbose = verbose, initPar="fixed effects")
+
+# Interpret results
+m2.post = Hmsc::convertToCodaObject(m2)
+m2.df <- as.data.frame(rbind(m2.post$Beta[[1]],m2.post$Beta[[2]]))
+bayesplot::mcmc_areas(m2.df)
+summary(m2.post$Beta)
+plot(m2.post$Beta)
+preds = computePredictedValues(m2)
+evaluateModelFit(hM=m2, predY=preds)
+preds.mean = apply(preds, FUN=mean, MARGIN=1)
+nres = scale(y-preds.mean)
+par(mfrow=c(1,2))
+hist(nres, las = 1)
+plot(preds.mean,nres, las = 1)
+abline(a=0,b=0)
+```
+
+We can see that by properly taking the random effects of plot into account, using a mixed model, we can now correctly estimate the $\alpha = \beta_1$ and $\beta = \beta_2$ coefficients.
+
+We cannot look more carefully at the HMSC estimates for the random effects. This is complicated. We recall that HMSC uses latent variables. I make some very fast code to extract these:
+
+```{r out.width="70%"}
+etaPost=getPostEstimate(m2, "Eta")
+lambdaPost=getPostEstimate(m2, "Lambda")
+biPlot(m2, etaPost = etaPost, lambdaPost = lambdaPost, factors = c(1,1), "x")
+```
+I will leave the latent variable code for another time, but here are also we end. From Abrego & Ovaskainen, "the model does not have the possibility to estimate the actual random effect for the plot".
