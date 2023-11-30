@@ -198,7 +198,7 @@ beta1 <- 450
 beta2 <- 1.23
 L <- beta1*x1 + beta2*x2
 
-p= c(0.3, 0.5, 0.1, 0.2, 0.7, 0.2, 0.4, 0.5, 0.2, 0.9) # proportion of residual variance that can be attributed to the plot level (of the 10 plots)
+p= c(0.3, 0.2, 0.5, 0.4, 0.3, 0.6, 0.4, 0.2, 0.1, 0.9) # correlation for sampling units inside same plots (plot 1-10), proportion of residual variance that can be attributed to the plot level
 sigma <- as.numeric(0.25)
 sigma.plot= (p*sigma/(-p+1)) 
 Sigma.plot=rep(sigma.plot, each=10)
@@ -225,11 +225,14 @@ for (j in 1:10) {
 diag(Sigma) <- Sigma.plot + sigma
 
 Sigma <- lqmm::make.positive.definite(Sigma, tol=1e-3)
-E=MASS::mvrnorm(n=1, mu = c(rep(0,100)), Sigma = Sigma) 
+E=MASS::mvrnorm(mu = c(rep(0,100)), Sigma = Sigma) 
+
 
 Y= L + E 
-Y
-plot(x,Y,main="Impact of environment x on population size Y at site i",ylab="yi")
+print(Y)
+plot(x,Y,main="Impact of environment x + Multivariate Normal Distribution on population size Y at site i",ylab="Y")
+lines(x, L, col="black", lwd=2)
+
 
 ```
 
