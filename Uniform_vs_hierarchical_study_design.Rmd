@@ -190,8 +190,9 @@ var(MASS::mvrnorm(n=1, mu=c(rep(0,10)), Sigma=Sigma)) # I just changed the synta
 ```
 
 
-Code for trying to create the within-plot variance for each of the 10 plots with a variance-covariance matrix
+## Code for tmodel with within-plot variance for each of the 10 plots with a variance-covariance matrix
 
+Create Model:
 ```{r out.width="70%"}
 set.seed(7) 
 n <- 100
@@ -229,16 +230,84 @@ for (j in 1:10) {
 diag(Sigma) <- Sigma.plot + sigma
 
 Sigma <- lqmm::make.positive.definite(Sigma, tol=1e-3)
-E=MASS::mvrnorm(mu = c(rep(0,100)), Sigma = Sigma) 
+E=MASS::mvrnorm(1,mu = c(rep(0,100)), Sigma = Sigma) 
 
+y= L + E 
 
-Y= L + E 
-print(Y)
-plot(x,Y,main="Impact of environment x + Multivariate Normal Distribution on population size Y at site i",ylab="Y")
+plot(x,y,main="Impact of environment x + Multivariate Normal Distribution on population size Y at site i",ylab="Y")
 lines(x, L, col="black", lwd=2)
 
 
 ```
+
+HMSC and explaining the MCMC + plots
+```{r}
+#constructing the model
+n.plot <- rep(1:10,each=10)
+plot.id = as.factor(n.plot)
+sample.id = as.factor(1:n)
+XData = data.frame(x = x)
+Y = as.matrix(y)
+studyDesign = data.frame(sample = sample.id, plot = plot.id) 
+rL = HmscRandomLevel(units = studyDesign$plot)
+m = Hmsc(Y = Y, XData = XData, XFormula = ~x,studyDesign = studyDesign, ranLevels = list("plot" = rL))
+
+#defining parameters for sampleMCMC function
+nChains = 2 # how many chains
+thin = 5 #  how much thinning to apply = how many steps of the iterations are stored (in this case every 5th step is stored)
+samples = 1000 # how many samples to obtain per chain
+transient = 500*thin # what length of a transient
+verbose = 500*thin # how frequently to see the progress of MCMC
+
+m = sampleMcmc(m, thin = thin, samples = samples, transient = transient,nChains = nChains, verbose = verbose)
+
+
+```
+```{r out.width="70%"}
+m.post = Hmsc::convertToCodaObject(m) # convert to coda object to extract the posterior distribution
+
+summary(m.post$Beta) # get results for the beta parameter
+plot(m.post$Beta) # plot results for the beta parameter
+effectiveSize(m.post$Beta) 
+gelman.diag(m.post$Beta,multivariate = FALSE)$psrf # potential scale reduction factor 
+
+
+
+```
+Description of the plots:
+- The two lines of the plot (black and red) describe the MCMC chains
+  - They yield identical results - convergence of the Chains, nice!
+  - they rapidly rise and fall - no autocorrelation, nice!
+  - seem to have reached a stationary distribution as first half of recorded iterations looks similar to second half in the plot, nice!
+
+
+- The effective sample size shows how much the consecutive samples are autocorrelated 
+- The potential scale reduction factor shows how consistent the results between both chains are 
+
+Explanatory power of model:
+
+```{r out.width="70%"}
+preds = computePredictedValues(m)
+MF = evaluateModelFit(hM = m, predY = preds) 
+MF$R2
+
+preds.mean = apply(preds, FUN = mean, MARGIN = 1) 
+nres = scale(y-preds.mean)
+par(mfrow = c(1,2))
+hist(nres)
+plot(preds.mean, nres)
+abline(a = 0, b = 0)
+```
+The first plot shows that the residuals are normally distributed, the second plot that the residual variation is homoscedastic.
+
+The R^2 value is a measure of the explanatory power of the model:
+\begin{align}
+R^{2} = 1 - \frac{SQR}{SQT} = 1 - \frac{(\sum_{i}(y_i - \hat{y}) ^2)}{(\sum_{i}(y_i - \overline{y})^2)}
+\end{align}
+
+...Include  what R2 does
++ why it shoud be evaluated more by cross validation/ why it does not describe the predicitve power of the model
+
 
 ## 1A. Linear model, single species
 
