@@ -276,9 +276,9 @@ gelman.diag(m.post$Beta,multivariate = FALSE)$psrf # potential scale reduction f
 ```
 Description of the plots:
 - The two lines of the plot (black and red) describe the MCMC chains
-  - They yield identical results - convergence of the Chains, nice!
-  - they rapidly rise and fall - no autocorrelation, nice!
-  - seem to have reached a stationary distribution as first half of recorded iterations looks similar to second half in the plot, nice!
+  - They yield identical results - convergence of the Chains
+  - they rapidly rise and fall - no autocorrelation
+  - seem to have reached a stationary distribution as first half of recorded iterations looks similar to second half in the plot
 
 
 - The effective sample size shows how much the consecutive samples are autocorrelated 
@@ -305,8 +305,13 @@ The R^2 value is a measure of the explanatory power of the model:
 R^{2} = 1 - \frac{SQR}{SQT} = 1 - \frac{(\sum_{i}(y_i - \hat{y}) ^2)}{(\sum_{i}(y_i - \overline{y})^2)}
 \end{align}
 
-...Include  what R2 does
-+ why it shoud be evaluated more by cross validation/ why it does not describe the predicitve power of the model
+SQR gets bigger if there is a higher error value (high residual values -> higher values in numerator ->), leading to a smaller R2. 
+
+
+```{r}
+1- (sum((m$Y-preds.mean)^2))/(sum((m$Y-mean(m$Y))^2))
+```
+
 
 
 ## 1A. Linear model, single species
