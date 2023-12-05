@@ -190,7 +190,7 @@ var(MASS::mvrnorm(n=1, mu=c(rep(0,10)), Sigma=Sigma)) # I just changed the synta
 ```
 
 
-## Code for tmodel with within-plot variance for each of the 10 plots with a variance-covariance matrix
+## Code for model with within-plot variance with variance-covariance matrix
 
 Create Model:
 ```{r out.width="70%"}
@@ -256,11 +256,11 @@ m = Hmsc(Y = Y, XData = XData, XFormula = ~x,studyDesign = studyDesign, ranLevel
 nChains = 2 # how many chains
 thin = 5 #  how much thinning to apply = how many steps of the iterations are stored (in this case every 5th step is stored)
 samples = 1000 # how many samples to obtain per chain
-transient = 500*thin # what length of a transient
+transient = 500*thin # what length of a transient, when to start storing the results (here at step 2500)
+# every 5th sample is stored (thinning) * 1000 samples are obtained (samples) + 2500 samples are discarded at the beginning (transient) = 7500 step chain *2 (nChains)
 verbose = 500*thin # how frequently to see the progress of MCMC
 
 m = sampleMcmc(m, thin = thin, samples = samples, transient = transient,nChains = nChains, verbose = verbose)
-
 
 ```
 ```{r out.width="70%"}
@@ -275,14 +275,19 @@ gelman.diag(m.post$Beta,multivariate = FALSE)$psrf # potential scale reduction f
 
 ```
 Description of the plots:
-- The two lines of the plot (black and red) describe the MCMC chains
-  - They yield identical results - convergence of the Chains
-  - they rapidly rise and fall - no autocorrelation
-  - seem to have reached a stationary distribution as first half of recorded iterations looks similar to second half in the plot
 
+The two lines of the plot (black and red) describe the MCMC chains: 
 
-- The effective sample size shows how much the consecutive samples are autocorrelated 
-- The potential scale reduction factor shows how consistent the results between both chains are 
++ They yield identical results - convergence of the Chains
++ they rapidly rise and fall - no autocorrelation
++ They seem to have reached a stationary distribution as first half of recorded iterations looks similar to second half in the plot
+
+Quantitative measure of convergence: 
+
++ The effective sample size shows how much the consecutive samples are autocorrelated: No autocorrelation -> no direction the samples of the MCMC are going -> They are jumping around a mean which should be the parameter mean
++ The potential scale reduction factor shows how consistent the results between both chains are: Is an estimate of how much narrower the posterior might become with an infinite number of iterations, when (near) 1, the cahins have converged and are similar to each other. -> "A large PSRF indicates that the between-chain variance is substantially greater than the within-chain variance, so that longer simulation is needed. If a PSRF is close to 1, then the associated chains are likely to have converged to one target distribution. A large PSRF (perhaps generally when a PSRF > 1.2) indicates convergence failure, and can indicate the presence of a multimodal marginal posterior distribution in which different chains may have converged to different local modes (see is.multimodal), or the need to update the associated chains longer, because burn-in (see burnin) has yet to be completed." 
+[link](https://search.r-project.org/CRAN/refmans/LaplacesDemon/html/Gelman.Diagnostic.html#:~:text=The%20'potential%20scale%20reduction%20factor,number%20of%20iterations%20approaches%20infinity.)
+
 
 Explanatory power of model:
 
