@@ -189,6 +189,136 @@ Sigma <- lqmm::make.positive.definite(Sigma, tol=1e-3)
 var(MASS::mvrnorm(n=1, mu=c(rep(0,10)), Sigma=Sigma)) # I just changed the syntax a little and also put 0 for mu, but I still need to figure out how multivariate normal distribution really functions. So this was a first attempt to do so. 
 ```
 
+
+## Code for model with within-plot variance with variance-covariance matrix
+
+Create Model:
+```{r out.width="70%"}
+set.seed(7) 
+n <- 100
+x = rnorm(n) 
+x1 <- rep(1,n)
+x2 <- x
+beta1 <- 450
+beta2 <- 1.23
+L <- beta1*x1 + beta2*x2
+
+p= c(0.3, 0.2, 0.5, 0.4, 0.3, 0.6, 0.4, 0.2, 0.1, 0.9) # correlation for sampling units inside same plots (plot 1-10), proportion of residual variance that can be attributed to the plot level
+sigma <- as.numeric(0.25)
+sigma.plot= (p*sigma/(-p+1)) 
+Sigma.plot=rep(sigma.plot, each=10)
+
+Sigma <- matrix(rep(0,100),nrow=100,ncol=100)
+
+counter=0
+for (j in 1:10) {
+  for (i in 1:10) {
+    Sigma [i+counter,1+counter]= sigma.plot[j]
+    Sigma [i+counter,2+counter]= sigma.plot[j]
+    Sigma [i+counter,3+counter]= sigma.plot[j]
+    Sigma [i+counter,4+counter]= sigma.plot[j]
+    Sigma [i+counter,5+counter]= sigma.plot[j]
+    Sigma [i+counter,6+counter]= sigma.plot[j]
+    Sigma [i+counter,7+counter]= sigma.plot[j]
+    Sigma [i+counter,8+counter]= sigma.plot[j]
+    Sigma [i+counter,9+counter]= sigma.plot[j]
+    Sigma [i+counter,10+counter]= sigma.plot[j]
+  } 
+  counter=counter+10
+}
+
+diag(Sigma) <- Sigma.plot + sigma
+
+Sigma <- lqmm::make.positive.definite(Sigma, tol=1e-3)
+E=MASS::mvrnorm(1,mu = c(rep(0,100)), Sigma = Sigma) 
+
+y= L + E 
+
+plot(x,y,main="Impact of environment x + Multivariate Normal Distribution on population size Y at site i",ylab="Y")
+lines(x, L, col="black", lwd=2)
+
+
+```
+
+HMSC and explaining the MCMC + plots
+```{r}
+#constructing the model
+n.plot <- rep(1:10,each=10)
+plot.id = as.factor(n.plot)
+sample.id = as.factor(1:n)
+XData = data.frame(x = x)
+Y = as.matrix(y)
+studyDesign = data.frame(sample = sample.id, plot = plot.id) 
+rL = HmscRandomLevel(units = studyDesign$plot)
+m = Hmsc(Y = Y, XData = XData, XFormula = ~x,studyDesign = studyDesign, ranLevels = list("plot" = rL))
+
+#defining parameters for sampleMCMC function
+nChains = 2 # how many chains
+thin = 5 #  how much thinning to apply = how many steps of the iterations are stored (in this case every 5th step is stored)
+samples = 1000 # how many samples to obtain per chain
+transient = 500*thin # what length of a transient, when to start storing the results (here at step 2500)
+# every 5th sample is stored (thinning) * 1000 samples are obtained (samples) + 2500 samples are discarded at the beginning (transient) = 7500 step chain *2 (nChains)
+verbose = 500*thin # how frequently to see the progress of MCMC
+
+m = sampleMcmc(m, thin = thin, samples = samples, transient = transient,nChains = nChains, verbose = verbose)
+
+```
+```{r out.width="70%"}
+m.post = Hmsc::convertToCodaObject(m) # convert to coda object to extract the posterior distribution
+
+summary(m.post$Beta) # get results for the beta parameter
+plot(m.post$Beta) # plot results for the beta parameter
+effectiveSize(m.post$Beta) 
+gelman.diag(m.post$Beta,multivariate = FALSE)$psrf # potential scale reduction factor 
+
+
+
+```
+Description of the plots:
+
+The two lines of the plot (black and red) describe the MCMC chains: 
+
++ They yield identical results - convergence of the Chains
++ they rapidly rise and fall - no autocorrelation
++ They seem to have reached a stationary distribution as first half of recorded iterations looks similar to second half in the plot
+
+Quantitative measure of convergence: 
+
++ The effective sample size shows how much the consecutive samples are autocorrelated: No autocorrelation -> no direction the samples of the MCMC are going -> They are jumping around a mean which should be the parameter mean
++ The potential scale reduction factor shows how consistent the results between both chains are: Is an estimate of how much narrower the posterior might become with an infinite number of iterations, when (near) 1, the cahins have converged and are similar to each other. -> "A large PSRF indicates that the between-chain variance is substantially greater than the within-chain variance, so that longer simulation is needed. If a PSRF is close to 1, then the associated chains are likely to have converged to one target distribution. A large PSRF (perhaps generally when a PSRF > 1.2) indicates convergence failure, and can indicate the presence of a multimodal marginal posterior distribution in which different chains may have converged to different local modes (see is.multimodal), or the need to update the associated chains longer, because burn-in (see burnin) has yet to be completed." 
+[link](https://search.r-project.org/CRAN/refmans/LaplacesDemon/html/Gelman.Diagnostic.html#:~:text=The%20'potential%20scale%20reduction%20factor,number%20of%20iterations%20approaches%20infinity.)
+
+
+Explanatory power of model:
+
+```{r out.width="70%"}
+preds = computePredictedValues(m)
+MF = evaluateModelFit(hM = m, predY = preds) 
+MF$R2
+
+preds.mean = apply(preds, FUN = mean, MARGIN = 1) 
+nres = scale(y-preds.mean)
+par(mfrow = c(1,2))
+hist(nres)
+plot(preds.mean, nres)
+abline(a = 0, b = 0)
+```
+The first plot shows that the residuals are normally distributed, the second plot that the residual variation is homoscedastic.
+
+The R^2 value is a measure of the explanatory power of the model:
+\begin{align}
+R^{2} = 1 - \frac{SQR}{SQT} = 1 - \frac{(\sum_{i}(y_i - \hat{y}) ^2)}{(\sum_{i}(y_i - \overline{y})^2)}
+\end{align}
+
+SQR gets bigger if there is a higher error value (high residual values -> higher values in numerator ->), leading to a smaller R2. 
+
+
+```{r}
+1- (sum((m$Y-preds.mean)^2))/(sum((m$Y-mean(m$Y))^2))
+```
+
+
+
 ## 1A. Linear model, single species
 
 HMSC (Vignette 1) simulate univariate data, which represents population size `n` of a single species sampled at $i$ = 50 sampling units, each of which has a distinct value for an environmental covariate $x_i$. The data is simulated by the standard linear model with normally distributed residuals:
