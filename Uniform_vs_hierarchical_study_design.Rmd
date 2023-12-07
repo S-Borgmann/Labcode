@@ -585,3 +585,92 @@ lambdaPost=getPostEstimate(m2, "Lambda")
 biPlot(m2, etaPost = etaPost, lambdaPost = lambdaPost, factors = c(1,1), "x")
 ```
 I will leave the latent variable code for another time, but here are also we end. From Abrego & Ovaskainen, "the model does not have the possibility to estimate the actual random effect for the plot".
+
+## 2. Spatial autocorrelation
+
+Spatial structure may not only follow a plot structure, but instead it may be that residuals are correlated in a way that depends on the distance (euclidean distance, in xy or latitude-longitude) between sites i and j. HMSC models the variance-covariance matrix as:
+
+$$\Sigma_{ij} = f(d_{ij}) + \delta_{ij} \sigma^2$$
+
+where $d_{ij}$ is the distance between sampling units *i* and *j*, and $f(d)$ is the spatial covariance function. $\delta_{ij} = 0$ for $i=j$ and $\delta_{ij} = 0$ for $i \neq j$.
+
+HMSC implements 1 specific spatial covariance function:
+
+$$ f(d) = \sigma_S^2 e^{-d_{ij} / \alpha} $$
+Here, $\sigma_S^2$ is the spatial variance and $\alpha$ is the characteristic spatial scale of the spatial autocorrelation.
+
+We can look at sites with spatial autocorrelation in this way:
+
+```{r warning=FALSE}
+n = 100
+beta1 = 0
+beta2 = 1
+sigma = 1
+sigma.spatial = 2
+alpha.spatial = 0.5
+x = rnorm(n)
+L = beta1 + beta2*x
+xycoords = matrix(runif(2*n), ncol = 2)
+Sigma = sigma.spatial^2*
+  exp(-as.matrix(dist(xycoords))/alpha.spatial)
+a = mvrnorm(mu=rep(0,n), Sigma = Sigma)
+y = L + a + rnorm(n, sd = sigma)
+
+# plot x variable - no spatial structure
+pal <- colorRampPalette(c("white", "blue"))
+plot(xycoords,col="grey90", fill=TRUE, warnings=F, xlab="X coord",ylab="Y coord")
+options(warn=0)
+points(xycoords[,1], xycoords[,2],pch = 21,bg = pal(10)[as.numeric(cut(x,breaks = 10))],col="black")
+
+legend_image <- as.raster(matrix(rev(pal(10)), ncol=1))
+plot(c(0,2),c(0,1),type = 'n', axes = F,xlab = '', ylab = '', main = 'E value')
+text(x=1.5, y = seq(0,1,l=5), labels = seq(0,1,l=5))
+rasterImage(legend_image, 0, 0, 1, 1) ## set new for ov
+
+# plot y, spatial structure
+pal <- colorRampPalette(c("white", "orange"))
+plot(xycoords,col="grey90", fill=TRUE, warnings=F, xlab="X coord",ylab="Y coord")
+options(warn=0)
+points(xycoords[,1], xycoords[,2],pch = 21,bg = pal(10)[as.numeric(cut(y,breaks = 10))],col="black")
+
+legend_image <- as.raster(matrix(rev(pal(10)), ncol=1))
+plot(c(0,2),c(0,1),type = 'n', axes = F,xlab = '', ylab = '', main = 'y (abundance)')
+text(x=1.5, y = seq(0,1,l=6), labels = seq(0,15,l=6))
+rasterImage(legend_image, 0, 0, 1, 1) ## set new for overplot w/ next plot
+
+plot(apply(xycoords,1,dist),y)
+
+```
+
+And we can consider this spatial structure in an HMSC model to estimate the intercept and beta parameters, as well as the spatial parameters:
+
+```{r}
+sample.id = as.factor(1:n)
+studyDesign = data.frame(sample = sample.id)
+rownames(xycoords) = sample.id
+rL = HmscRandomLevel(sData = xycoords)
+XData = data.frame(x)
+Y = as.matrix(y)
+m = Hmsc(Y = Y, XData = XData, XFormula = ~x,
+studyDesign = studyDesign, ranLevels = list("sample" = rL))
+
+# MCMC parameters
+nChains = 2
+thin = 5
+samples = 2000
+transient = 500*thin
+verbose = 500*thin
+# Fit model
+m = sampleMcmc(m, thin = thin, samples = samples, transient = transient, nChains = nChains, verbose = verbose)
+```
+
+```{r}
+mpost = convertToCodaObject(m)
+plot(mpost$Alpha[[1]])
+plot(mpost$Beta)
+```
+
+
+
+
+
