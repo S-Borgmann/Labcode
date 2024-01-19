@@ -1,0 +1,149 @@
+---
+title: "Chapter 6.6"
+author: "Ruben J, Hermann"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(Hmsc)
+library(ape)
+library(MASS)
+library(tidyverse)
+```
+
+## 6.7 Real Case Study with HMSC: How Do Plant Traits Influence Their Distribution?
+
+As a real data case study, we will re-analyse plant data that Miller et al. (2018; 2019) used to compare several statistical methods for studying trait environment relationships. These data were collected by Damschen et al. (2010), who revisited Whittaker’s historical plant community study sites in Siskiyou Mountains of Southwest Oregon, following the original methods (Whittaker 1960). Whittaker chose the sites to represent the range of topographic variation in the area. In each site, a single 0.1 ha study plot was established, and twenty-five quadrates of size 1 m x 1 m were surveyed along a 50 m transect. The species abundances were recorded as the number of 100 quadrat corners in which each species was found.
+
+```{r}
+
+data = read.csv(file = file.path("Real_Data/Section_6_7_plants/data","whittaker revisit data.csv"))
+head(data)
+```
+
+***explaining the data***  
+The data are in the long format, where each row corresponds to one plant species on one site. The column value is the count of plant abundance. The column env is Whittaker’s index describing the site’s position along the topographic moisture gradient (TMG). Sites on mesic, north-facing slopes receive lower TMG values than sites on warmer, south-facing slopes (Damschen et al. 2010; Miller et al. 2019). The column trait is the functional trait that Miller et al. (2019) selected for their analyses: leaf tissue carbon-to-nitrogen ratio (C:N). This ratio can be considered as a surrogate of competitive ability: plants with low C:N grow faster but have lower stress tolerance than plants with high C:N (Cornelissen et al. 2003; Miller et al. 2019; Poorter & Bongers 2006). It can thus be expected that species occurring on dry and warm sites have on average higher C:N ratios, resulting in a positive relationship between TMG and C:N. Miller et al. (2019) applied several statistical methods to examine the association between the C:N ratio and the environmental gradient, which we will now readdress by reanalysing the data with HMSC.
+
+First reformate the data --> construct the matrix **Y** of species abundance, the dataframe XData of environmental variable TMG, and dataframe TrData of the C:N ratio
+
+```{r}
+data$site = factor(data$site)
+data$species = factor(data$species)
+sites = levels(data$site)
+species = levels(data$species)
+n = length(sites)
+ns = length(species)
+Y = matrix(NA, nrow = n, ncol = ns)
+env = rep(NA, n)
+trait = rep(NA, ns)
+for (i in 1:n){
+for (j in 1:ns){
+row = data$site==sites[i] & data$species==species[j]
+Y[i,j] = data[row,]$value
+env[i] = data[row,]$env
+trait[j] = data[row,]$trait
+}
+}
+colnames(Y) = species
+XData = data.frame(TMG = env)
+TrData = data.frame(CN = trait)
+rownames(TrData) <- species
+```
+
+Exploring data by plotting histograms
+
+```{r}
+P = colMeans(Y > 0)
+A = colSums(Y)/colSums(Y > 0)
+```
+
+To account for relatedness among species, we will use taxonomy as a proxy for phylogeny. To do so, in the script below we read in a classification of the species into families and genera, and then use the function as.phylo from the ape package to construct a taxonomical tree. We assume equal branch lengths among families, among genera within a family, and among species within a genus.
+
+```{r}
+taxonomy = read.csv(file = file.path("Real_Data/Section_6_7_plants/data","taxonomy.csv"))
+for(i in 1:ncol(taxonomy)){
+  taxonomy[,i] <- as.factor(taxonomy[,i])
+}
+
+plant.tree = as.phylo(~family/genus/species,data = taxonomy, collapse = FALSE)
+plant.tree$edge.length = rep(1, length(plant.tree$edge))
+plot(plant.tree)
+```
+
+### 6.7.1 Setting up and Fitting HMSC Models
+
+To examine the robustness of the results, we will fit two models: a probit model to the presence–absence data, and a lognormal Poisson model to the full count data. In the script below, we include both models into a single list named models.
+
+```{r}
+XFormula = ~TMG
+TrFormula = ~CN
+models = list()
+models[[1]] = Hmsc(Y=1*(Y > 0), XData = XData,XFormula = XFormula,TrData = TrData,TrFormula = TrFormula, phyloTree = plant.tree,distr = "probit")
+models[[2]] = Hmsc(Y = Y, XData = XData,XFormula = XFormula,TrData = TrData,TrFormula = TrFormula, phyloTree = plant.tree,distr = "lognormal poisson")
+```
+
+### 6.7.2 Do Species that Occur on Dry, Warm Sites Have a High Carbon-to-Nitrogen Ratio?
+
+The parameter estimates of species niches (Figure 6.18) show that many species respond negatively to the TMG. This means that species are more likely to be present (Figure 6.18A) and be more abundant (Figure 6.18B) in sites with low TMG values, i.e. in sites located on mesic, north-facing slopes.
+
+Next fit as usual
+```{r}
+nChains = 2
+thin = 5
+samples = 1000
+transient = 500*thin
+verbose = 500*thin
+```
+```{r}
+for (i in 1:2){
+models[[i]] = sampleMcmc(models[[i]], thin = thin,
+samples = samples, transient = transient,
+nChains = nChains, verbose = verbose)
+}
+```
+
+We next construct gradient plots to examine how species richness and the community-weighted mean of C:N vary over the environmental gradient of TMG.
+
+```{r}
+for (i in 1:2){
+m = models [[i]]
+Gradient = constructGradient(m, focalVariable = "TMG")
+predY = predict(m, Gradient = Gradient, expected = TRUE)
+q = c(0.25,0.5,0.75)
+plotGradient(m, Gradient, pred = predY, measure = "S",showData = TRUE, q = q)
+plotGradient(m, Gradient, pred = predY, measure= "T", index = 2,showData = TRUE, q = q)
+}
+```
+
+Using VariancePartitioning to ask how much of variation in species niches and occurrences is explained by C:N ratio
+
+```{r}
+VP = computeVariancePartitioning(models [[1]],
+group = c(1,1), groupnames = "TMG")
+VP$R2T
+```
+
+```{r}
+VP = computeVariancePartitioning(models[[2]],
+group = c(1,1),groupnames = "TMG")
+VP$R2T
+```
+
+We observe that C:N explains not only how species respond to TMG, but also a substantial part of the variation among the species in their intercepts, in line with the discussion above
+
+Let us finally ask if there is evidence of phylogenetic signal in the residual variation in species niches, on top of what can be explained by the trait C:N.
+
+```{r}
+mpost = convertToCodaObject(models[[1]])
+summary(mpost$Rho)$quant
+
+mpost = convertToCodaObject(models[[2]])
+summary(mpost$Rho)$quant
+
+```
+
+We do not find such evidence, and hence conclude that related species do not respond more similarly to TMG than unrelated species, beyond what can be expected based on their C:N
+
+In line with our results, Miller et al. (2019) found a strong negative main effect of TMG on abundance, and a strong positive main effect of C:N on abundance. However, they found support for the relationship between C:N and TMG with only some of the applied methods. Based on our analyses, there is good evidence for a positive relationship between C:N and TMG, both for species occurrences (Figure 6.19A) and abundances (Figure 6.19B). Thus, our HMSC analyses give support for the original hypothesis that species occurring on drier and warmer sites have on average higher C:N than those occurring in moister and cooler sites.

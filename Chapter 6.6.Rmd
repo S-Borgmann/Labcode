@@ -1,5 +1,5 @@
 ---
-title: "Chapter 6"
+title: "Chapter 6.6"
 author: "Ruben J, Hermann"
 date: "`r Sys.Date()`"
 output: html_document
