@@ -670,7 +670,37 @@ plot(mpost$Alpha[[1]])
 plot(mpost$Beta)
 ```
 
+Another part that needs explanation is the Variance Partioning (Varpart). It is used in the Hmsc to explain how much the variance in a covariate explains the covariate in the depended variable. As the covariate are as well measured empirical data they have a variance (e.g. temperature changing depending on the measurement). The equation for a single covariate is given by: $$\beta^2_kVar[x_{.k}]/Var[L]$$. 
+k determines which covarite is used, the . stands for the full vector off all measurements from this covariate. We can show this effect with a simple example as above, in which we predict a variable with a single covariate
+```{r}
+n = 100
+beta1 = 450
+beta2 = 1
+x = rnorm(n)
+L = beta1 + beta2*x
+"Variation of L explained by variation of covariate x:";beta^2*var(x)/var(L)
+```
+As we see here the variance in covariate x predict all the variance in the linear predictor L, which makes sense as all the only variable with variance in this equation is x. So that all variance here can come only from x.
 
+Lets see what happens when we add a second variable:
+```{r}
+set.seed(1)
+n = 100
+beta1 = 450
+beta2 = 1
+beta3 = 1
+x = rnorm(n,sd=1)
+x2 = rnorm(n,sd=1)
+L = beta1 + beta2*x + beta3*x2
+"Variation of L explained by variation of covariate x:";beta^2*var(x)/var(L)
+```
+Now the variance in the first covariate is 47%, so explains almost half of the variation in L, which makes sens as both x and x2 are drawn from the sam distribution and have the same beta. But then why is it 47% and not 50%?
+```{r}
+"Variation of covariate x:";var(x)
+"Variation of covariate x2:";var(x2)
+```
 
-
-
+While they are both drawn from the same distrubtion x2 has a slightly greate variance, which is expectd as we have only 100 draws from the distribution the variance is not a perfect representation of the original distribution (with a standard deviation = 1). This results shows that an increased variance in one of the covariate, results in a greater variance in L. So the reate variance in x2 results in a greater explanation of the variance in L.
+```{r}
+"Variation of L explained by variation of covariate x2:";beta^2*var(x2)/var(L)
+```
