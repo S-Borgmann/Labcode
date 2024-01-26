@@ -11,6 +11,7 @@ library(Hmsc)
 library(ape)
 library(MASS)
 library(tidyverse)
+library(bayesplot)
 ```
 
 
@@ -18,6 +19,7 @@ library(tidyverse)
 first generating niche variation for species communities depicted in Fig 6.5
 scirpt uses rcoal function from ape package to construct random phylogeny of 100 species and vcv function of ape package to turn phylogenetic tre into a phylogenetic correlation matrix **C**
 ```{r}
+set.seed(7) 
 ns = 100
 phy = rcoal(n = ns, tip.label = sprintf('sp_%.3d',1:ns), br = 'coalescent')
 C = vcv(phy, model = 'Brownian', corr = TRUE)
@@ -176,3 +178,147 @@ postGamma = getPostEstimate(m, parName = "Gamma")
 plotGamma(m, post = postGamma, param = "Sign",
 supportLevel = 0.95)
 ```
+
+### Variation in Species Niches: Synthesis
+
+The goal of this exercise is to simulate species responses to two environmental predictor $x$, in a spatially structured landscape, when species traits have an impact on species' responses to the environment. We build from the code presented in Chapter 5.
+
+#### Step 1. Simulate the spatial structure and environment
+
+```{r warning=FALSE}
+n = 50 # Number of sites
+ns = 100 # Number of species
+beta1 = rnorm(ns,450,50) # Intercept
+Tr.A <- cbind(beta1,rnorm(ns),rnorm(ns,5,1))
+colnames(Tr.A) <- c("t1","t2","t3")
+head(Tr.A)
+```
+
+Here we give an Intercept for all species $\beta_1 \sim N(450,50)$. We will build the response to environmental property 2 ($\beta_2$)  and 3 ($b_3$) as due to species traits. We represent those traits as simply randomly generated values: $T_{i,2} \sim N(0,1)$, $T_{i,3} \sim N(5,1)$.
+
+We now define the $\Gamma$ matrix - this is the $n_c \times n_t$ (number of environmental covariates $\times$ number of traits) matrix, with elements $\gamma_{kl}$ (where $k$ is environmental covariate $k$ and $l$ is trait $l$). $\gamma_{kl}$ thus measures the effect of trait $l$ on the response to covariate $k$ (which we established is shared for all species).
+
+```{r}
+gamma <- cbind(c(1,0,0),c(0,runif(1),0),c(0,0,runif(1)))
+gamma
+```
+
+**I confess I struggle with this. We don't have strong guidance from Chapter 6 on what these values are expected to be. I will be interested to better understand expected values of these in nature / as correspond to biological hypotheses. For now, I put only a single trait impacting a single beta, and I gave those a small magnitude of impact (so that the niche isn't perfectly explained by the trait)**
+
+Now we calculate $\mu_{kj}$, the expected response of species $j$ to covariate $k$ according to formula 6.3:
+
+$$\mu_{kj} = \sum^{n_t}_{l=1}t_{jl} \gamma_{kl}$$
+In other words, for each species instead of treating $\beta_{kj}$ as fixed, their expected values $mu_{kj}$ are now dependent on trait values $t_{jl}$ and the impact of traits for the response to the environment $\gamma_{kl}$. We generate those for each species:
+
+```{r}
+mu.A <- gamma %*% t(Tr.A)
+dim(mu.A)
+mu.A[,1:5]
+```
+
+To better understand what this is doing, we calculate the expected intercept for Species 1:
+
+$$\mu_{t=1,j=1} = (t_{j=1,t=1} \gamma_{11}) + (t_{j=1,t=2} \gamma_{12}) + (t_{j=1,t=3} \gamma_{13})$$
+
+```{r}
+# Species 1 Intercept
+Tr.A[1,1]*gamma[1,1] + Tr.A[1,2]*gamma[1,2] + Tr.A[1,3]*gamma[1,3]
+mu.A[1,1]
+Tr.A[1,1]
+# Species 1, Mu-1
+Tr.A[1,2]*gamma[2,1] + Tr.A[1,2]*gamma[2,2] + Tr.A[1,3]*gamma[2,3]
+mu.A[2,1]
+Tr.A[1,2]
+# Species 1, Mu-2
+Tr.A[1,3]*gamma[3,1] + Tr.A[1,2]*gamma[3,2] + Tr.A[1,3]*gamma[3,3]
+mu.A[3,1]
+Tr.A[1,3]
+```
+
+The next step given on page 121 is to 'generate the species niches' - we will assume the residual variation is fully *independent* among species (no impact of phylogenetic relatedness):
+
+```{r}
+v1 <- .1*50
+v2 <- .1*1
+v3 <- .1*1
+V2 = diag(3) * c(v1,v2,v3)
+sigma= kronecker(diag(ns),V2)
+beta.A = matrix(mvrnorm(n=1,mu=as.vector(mu.A),Sigma=sigma,) ,ncol=ns)
+cbind(beta.A[,1],mu.A[,1])
+```
+
+Now we simulate the species data:
+
+```{r}
+# Site-specific environmental covariates
+X <- cbind(rep(1,n),rnorm(n),rnorm(n))
+head(X)
+# Linear predictors
+L.A <- X %*% beta.A
+# Observed Y values
+Y.A <- L.A + matrix(rnorm(n*ns),ncol=ns) # Continuous Y values
+rbind(L.A[1,1:5],Y.A[1,1:5])
+```
+
+#### Fitting the HMSC
+
+```{r}
+Y = Y.A
+colnames(Y) = paste("s",1:100,sep="")
+Tr = Tr.A
+TrData = data.frame(trait = Tr [,2:3])
+rownames(Tr.A) <- colnames(Y)
+XData = data.frame(x = X [,2:3])
+```
+
+
+```{r}
+m = Hmsc(Y = Y, XData = XData, XFormula = ~x.1 + x.2, TrData = TrData,
+TrFormula = ~trait.t2 + trait.t3, distr = "normal")
+```
+
+Model fitting
+```{r}
+nChains = 2
+thin = 5
+samples = 1000
+transient = 500*thin
+verbose = 500*thin
+```
+```{r}
+verbose = 0
+m = sampleMcmc(m, thin = thin, samples = samples,
+transient = transient, nChains = nChains, verbose = verbose)
+```
+
+Now we evaluate the MCMC estimates for $\beta$:
+
+```{r}
+m.post = Hmsc::convertToCodaObject(m)
+m.df <- as.data.frame(rbind(m.post$Beta[[1]],m.post$Beta[[2]]))
+# Rename coefficients
+g <- rep(c("int","x1","x2"),times=s)
+mcmc_intervals(m.df[g=="int"],point_size=1) + ggtitle("Beta, Intercept") + theme(axis.text.y=element_blank())
+mcmc_intervals(m.df[g=="x1"],point_size=1) + ggtitle("Beta, x1") + theme(axis.text.y=element_blank())
+mcmc_intervals(m.df[g=="x2"],point_size=1) + ggtitle("Beta, x2") + theme(axis.text.y=element_blank())
+```
+
+```{r}
+hist(beta.A[1,])
+hist(beta.A[2,])
+hist(beta.A[3,])
+```
+
+Looks like we successfully re-estimated the $\beta$ values. What about the $\gamma$ estimates?
+
+```{r}
+gamma
+m.df.gamma <- as.data.frame(rbind(m.post$Gamma[[1]],m.post$Gamma[[1]]))
+colnames(m.df.gamma) <- c("g_x1.t1","g_x2.t1","g_x3.t1","g_x1.t2","g_x2.t2","g_x3.t2","g_x1.t3","g_x2.t3","g_x3.t3")
+mcmc_intervals(m.df.gamma,point_size=1) + ggtitle("Gamma Posterior")
+```
+
+These aren't especially great, so I will need to read more about them.
+
+
+
