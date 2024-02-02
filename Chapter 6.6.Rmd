@@ -203,7 +203,20 @@ gamma <- cbind(c(1,0,0),c(0,runif(1),0),c(0,0,runif(1)))
 gamma
 ```
 
-**I confess I struggle with this. We don't have strong guidance from Chapter 6 on what these values are expected to be. I will be interested to better understand expected values of these in nature / as correspond to biological hypotheses. For now, I put only a single trait impacting a single beta, and I gave those a small magnitude of impact (so that the niche isn't perfectly explained by the trait)**
+**I confess I struggle with this. We don't have strong guidance from Chapter 6 on what these values are expected to be. I will be interested to better understand expected values of these in nature / as correspond to biological hypotheses. For now, I put only a single trait impacting a single response to covariate, and I gave those a small magnitude of impact (so that the niche isn't a 1:1 match to the trait)**
+
+## Attempted biological example
+t2 --> weight (kg)
+t3 --> fur thickness (mm)
+X2 --> amount food received (g)
+X3 --> temperature (deg C)
+B2 --> change in # rabbits per 10g food received
+B3 --> change in # rabbits per deg C temp increase
+Yi --> # rabbits
+gamma_1 --> 1
+gamma_2 --> 0.1307782 --> magnitude of change in # rabbits per 10g food received (B2) due to value of t2
+gamma_3 --> 0.6892819 --> magnitude of change in # rabbits per 1 degC temp increase (B3) due to value of t3
+##
 
 Now we calculate $\mu_{kj}$, the expected response of species $j$ to covariate $k$ according to formula 6.3:
 
@@ -273,8 +286,7 @@ XData = data.frame(x = X [,2:3])
 
 
 ```{r}
-m = Hmsc(Y = Y, XData = XData, XFormula = ~x.1 + x.2, TrData = TrData,
-TrFormula = ~trait.t2 + trait.t3, distr = "normal")
+m = Hmsc(Y = Y, XData = XData, XFormula = ~x.1 + x.2, TrData = TrData, TrFormula = ~trait.t2 + trait.t3, distr = "normal")
 ```
 
 Model fitting
@@ -297,7 +309,7 @@ Now we evaluate the MCMC estimates for $\beta$:
 m.post = Hmsc::convertToCodaObject(m)
 m.df <- as.data.frame(rbind(m.post$Beta[[1]],m.post$Beta[[2]]))
 # Rename coefficients
-g <- rep(c("int","x1","x2"),times=s)
+g <- rep(c("int","x1","x2"),times=ns)
 mcmc_intervals(m.df[g=="int"],point_size=1) + ggtitle("Beta, Intercept") + theme(axis.text.y=element_blank())
 mcmc_intervals(m.df[g=="x1"],point_size=1) + ggtitle("Beta, x1") + theme(axis.text.y=element_blank())
 mcmc_intervals(m.df[g=="x2"],point_size=1) + ggtitle("Beta, x2") + theme(axis.text.y=element_blank())
@@ -315,10 +327,16 @@ Looks like we successfully re-estimated the $\beta$ values. What about the $\gam
 gamma
 m.df.gamma <- as.data.frame(rbind(m.post$Gamma[[1]],m.post$Gamma[[1]]))
 colnames(m.df.gamma) <- c("g_x1.t1","g_x2.t1","g_x3.t1","g_x1.t2","g_x2.t2","g_x3.t2","g_x1.t3","g_x2.t3","g_x3.t3")
-mcmc_intervals(m.df.gamma,point_size=1) + ggtitle("Gamma Posterior")
+mcmc_intervals(m.df.gamma,point_size=1) + ggtitle("Gamma Posterior") + xlim(c(-1,1))
 ```
 
-These aren't especially great, so I will need to read more about them.
+These aren't bad, looks like HMSC does estimate the gamma parameters. HMSC also has some built-in code for plotting Gamma values (but I prefer to see the full posterior when comparing to simulated values).
+
+```{r}
+postGamma = getPostEstimate(m, parName = "Gamma")
+plotGamma(m, post = postGamma, param = "Support",
+supportLevel = 0.95)
+```
 
 
 
