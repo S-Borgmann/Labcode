@@ -7,9 +7,9 @@
 # wd = "C:/HMSC_book/R-scripts/Section_6_7_plants"
 # setwd(wd)
 
-localDir = "."
-data.directory = file.path(localDir, "data")
-model.directory = file.path(localDir, "models")
+#localDir = "."
+data.directory = file.path("data/")
+model.directory = file.path("models/")
 library(Hmsc)
 set.seed(1)
 

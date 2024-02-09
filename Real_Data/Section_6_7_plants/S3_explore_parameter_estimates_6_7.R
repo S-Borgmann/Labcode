@@ -8,8 +8,8 @@
 # setwd(wd)
 
 localDir = "."
-data.directory = file.path(localDir, "data")
-model.directory = file.path(localDir, "models")
+data.directory = file.path("data/")
+model.directory = file.path("models/")
 library(Hmsc)
 set.seed(1)
 

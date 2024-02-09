@@ -18,14 +18,15 @@ getwd()
 # setwd(wd)
 
 localDir = "."
-data.directory = file.path(localDir, "data")
-model.directory = file.path(localDir, "models")
+data.directory = file.path("data/")
+model.directory = file.path("models/")
 
 # We load the Hmsc package, and set the random seed, so that all
 # results from this script are reproducible.
 
 library(Hmsc)
 set.seed(1)
+
 
 # The factor variables are coded as character strings in our data
 # set, and we need them be handled as factors, but this depends on
@@ -95,6 +96,7 @@ for (i in 1:n){
 colnames(Y) = species
 XData = data.frame(TMG = env)
 TrData = data.frame(CN = trait)
+rownames(TrData) <- species
 
 head(Y)
 head(XData)
@@ -131,6 +133,9 @@ hist(A, xlab = "Abundance (A)")
 
 taxonomy = read.csv(file=file.path(data.directory, "taxonomy.csv"))
 library(ape)
+for(i in 1:ncol(taxonomy)){
+  taxonomy[,i] <- as.factor(taxonomy[,i])
+}
 plant.tree <- as.phylo(~family/genus/species, data=taxonomy, collapse = FALSE)
 plant.tree$edge.length <- rep(1,length(plant.tree$edge))
 plot(plant.tree)
@@ -170,6 +175,7 @@ TrFormula = ~CN
 
 # The data have no specific structure and do not include any random
 # effects, thus we do not define studyDesign nor ranLevels
+
 
 model.pa = Hmsc(Y=(Y>0),
                 XData = XData,  XFormula=XFormula,
@@ -342,3 +348,4 @@ for (thin in c(1,10)) {
 # The script saves the finalized model after each thin. This means
 # that you will not lose finished models if you interrupt the script,
 # but they are in directory models.
+

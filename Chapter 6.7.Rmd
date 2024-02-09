@@ -18,7 +18,6 @@ library(tidyverse)
 As a real data case study, we will re-analyse plant data that Miller et al. (2018; 2019) used to compare several statistical methods for studying trait environment relationships. These data were collected by Damschen et al. (2010), who revisited Whittaker’s historical plant community study sites in Siskiyou Mountains of Southwest Oregon, following the original methods (Whittaker 1960). Whittaker chose the sites to represent the range of topographic variation in the area. In each site, a single 0.1 ha study plot was established, and twenty-five quadrates of size 1 m x 1 m were surveyed along a 50 m transect. The species abundances were recorded as the number of 100 quadrat corners in which each species was found.
 
 ```{r}
-
 data = read.csv(file = file.path("Real_Data/Section_6_7_plants/data","whittaker revisit data.csv"))
 head(data)
 ```
@@ -57,6 +56,9 @@ Exploring data by plotting histograms
 ```{r}
 P = colMeans(Y > 0)
 A = colSums(Y)/colSums(Y > 0)
+
+hist(A,ylab="Frequency",xlab="Abundances (A)",main="")
+hist(P,ylab="Frequency",xlab="Prevalence (P)",main="")
 ```
 
 To account for relatedness among species, we will use taxonomy as a proxy for phylogeny. To do so, in the script below we read in a classification of the species into families and genera, and then use the function as.phylo from the ape package to construct a taxonomical tree. We assume equal branch lengths among families, among genera within a family, and among species within a genus.

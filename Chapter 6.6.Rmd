@@ -16,7 +16,7 @@ library(tidyverse)
 
 ###  6.6.1 Simulating Species Niches
 first generating niche variation for species communities depicted in Fig 6.5
-scirpt uses rcoal function from ape package to construct random phylogeny of 100 species and vcv function of ape package to turn phylogenetic tre into a phylogenetic correlation matrix **C**
+scirpt uses rcoal function from ape package to construct random phylogeny of 100 species and vcv function of ape package to turn phylogenetic tree into a phylogenetic correlation matrix **C**
 ```{r}
 ns = 100
 phy = rcoal(n = ns, tip.label = sprintf('sp_%.3d',1:ns), br = 'coalescent')
@@ -24,7 +24,7 @@ C = vcv(phy, model = 'Brownian', corr = TRUE)
 plot(phy)
 ```
 
-phylogenetic tree cna be visualized with ``plot(phy)``
+phylogenetic tree can be visualized with ``plot(phy)``
 
 For Community A traits are sampled independently from standard normal distribution
 Community B traits are sampled from multivariate normal distribution, where variance-covariance matrix = phylogenetic matrix **C**
@@ -34,7 +34,7 @@ Tr.B = cbind(rep(1,ns), mvrnorm(n = 1,mu = rep(0, ns), Sigma = C))
 rownames(Tr.A) <- phy$tip.label
 ```
 
-For both intercept is added to the trait matrix (so Eq. 6.3 can be applied); then we defone $\Gamma$ matrix, which describes the link between species traits and niches and use matrix product ``%*%`` to compute expected values of species niches (according to Eq 6.3)
+For both intercept is added to the trait matrix (so Eq. 6.3 can be applied); then we define $\Gamma$ matrix, which describes the link between species traits and niches and use matrix product ``%*%`` to compute expected values of species niches (according to Eq 6.3)
 ```{r}
 gamma = cbind(c(-2,2), c(-1,1))
 mu.A = gamma %*% t(Tr.A)
@@ -44,10 +44,8 @@ mu.B = gamma %*% t(Tr.B)
 Next applying Eq 6.7 generating species niches --> Community A residual variation s phylogenetically fully structured & Community B residual variation is fully independent among species
 ```{r}
 V2 = diag(2)
-beta.A = matrix(mvrnorm(n = 1, mu = as.vector(mu.A),
-Sigma = kronecker(C, V2)), ncol = ns)
-beta.B = matrix(mvrnorm(n = 1, mu = as.vector(mu.B),
-Sigma = kronecker(diag(ns), V2)), ncol = ns)
+beta.A = matrix(mvrnorm(n = 1, mu = as.vector(mu.A),Sigma = kronecker(C, V2)), ncol = ns)
+beta.B = matrix(mvrnorm(n = 1, mu = as.vector(mu.B),Sigma = kronecker(diag(ns), V2)), ncol = ns)
 ```
 
 ### 6.6.2 Simulating Species Data
@@ -175,4 +173,28 @@ next function plotGamma to visualize how species niches are estimated to depend 
 postGamma = getPostEstimate(m, parName = "Gamma")
 plotGamma(m, post = postGamma, param = "Sign",
 supportLevel = 0.95)
+```
+
+
+Calculating $$R^2_{TY} = \frac{\sum^n_{i=1}Cov(a_i. L_i.)^2}{\sum^n_{i=1}Var(a_i.)Var(L_i.)}$$
+```{r}
+alpha.A = X %*% mu.A
+
+RTY2.A <- NULL
+for (i in 1:nrow(alpha.A)){
+  RTY2.A[i] <-(cor(alpha.A[i,],L.A[i,])^2)/(var(alpha.A[i,])*var(L.A[i,]))
+}
+RTY2.A
+sum(cor(alpha.A,Y.A)^2)/sum((var(alpha.A)*var(Y.A)))
+
+
+alpha.B = X %*% mu.B
+
+RTY2.B <- NULL
+for (i in 1:nrow(alpha.B)){
+  RTY2.B[i] <-(cor(alpha.B[i,],L.B[i,])^2)/(var(alpha.B[i,])*var(L.B[i,]))
+}
+RTY2.B
+sum(cor(alpha.B,L.B)^2)/sum((var(alpha.B)*var(L.B)))
+
 ```
