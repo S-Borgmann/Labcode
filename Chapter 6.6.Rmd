@@ -173,4 +173,3 @@ next function plotGamma to visualize how species niches are estimated to depend 
 postGamma = getPostEstimate(m, parName = "Gamma")
 plotGamma(m, post = postGamma, param = "Sign",
 supportLevel = 0.95)
-```
