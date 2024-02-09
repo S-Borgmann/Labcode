@@ -174,27 +174,3 @@ postGamma = getPostEstimate(m, parName = "Gamma")
 plotGamma(m, post = postGamma, param = "Sign",
 supportLevel = 0.95)
 ```
-
-
-Calculating $$R^2_{TY} = \frac{\sum^n_{i=1}Cov(a_i. L_i.)^2}{\sum^n_{i=1}Var(a_i.)Var(L_i.)}$$
-```{r}
-alpha.A = X %*% mu.A
-
-RTY2.A <- NULL
-for (i in 1:nrow(alpha.A)){
-  RTY2.A[i] <-(cor(alpha.A[i,],L.A[i,])^2)/(var(alpha.A[i,])*var(L.A[i,]))
-}
-RTY2.A
-sum(cor(alpha.A,Y.A)^2)/sum((var(alpha.A)*var(Y.A)))
-
-
-alpha.B = X %*% mu.B
-
-RTY2.B <- NULL
-for (i in 1:nrow(alpha.B)){
-  RTY2.B[i] <-(cor(alpha.B[i,],L.B[i,])^2)/(var(alpha.B[i,])*var(L.B[i,]))
-}
-RTY2.B
-sum(cor(alpha.B,L.B)^2)/sum((var(alpha.B)*var(L.B)))
-
-```
