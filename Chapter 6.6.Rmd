@@ -166,10 +166,3 @@ postBeta = getPostEstimate(m, parName = "Beta")
 plotBeta(m, post = postBeta, param = "Sign", plotTree = TRUE,
 supportLevel = 0.95, split = 0.4, spNamesNumbers = c(F,F))
 ```
-
-
-next function plotGamma to visualize how species niches are estimated to depend on species traits
-```{r}
-postGamma = getPostEstimate(m, parName = "Gamma")
-plotGamma(m, post = postGamma, param = "Sign",
-supportLevel = 0.95)
