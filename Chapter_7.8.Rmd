@@ -1,0 +1,125 @@
+---
+title: "Chapter 7.8"
+author: "Ruben J, Hermann"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(Hmsc)
+library(ape)
+library(MASS)
+library(tidyverse)
+library(bayesplot)
+library(corrplot)
+```
+
+
+## 7.8 Simulated Case Studies with HMSC
+
+### 7.8.1 Generating Simulated Data
+
+```{r}
+n = 200
+ns = 5
+X = cbind(rep(1, n), rnorm(n), rnorm(n))
+beta1 = rep(0, ns)
+beta2 = c(2,2,-2,-2,0)
+beta3 = c(1,-1,1,-1,0)
+beta = cbind(beta1, beta2, beta3)
+L = X %*% t(beta)
+Y = 1*((L + matrix(rnorm(n*ns), ncol = ns)) > 0)
+```
+
+In this script we have assumed that species 1 and 2 respond positively to the covariate $x_1$ whereas species 3 and 4 respond negatively. We have further assumed that species 1 and 3 respond positively to the covariate $x_2$ whereas species 2 and 4 respond negatively. Species 5 does not respond to either of the covariates.  
+Note that when generating the data, we have assumed no residual species associations, meaning that the species occur independ￾ently of each other after accounting for their responses to the covariates $x_1$ and $x_2$.
+
+```{r}
+colMeans(Y)
+```
+
+### 7.8.2 Defining and Fitting Three Alternative HMSC Models
+
+```{r}
+XData = data.frame(x1 = X[,2], x2 = X[,3])
+studyDesign = data.frame(sample = as.factor(1:n))
+rL = HmscRandomLevel(units = studyDesign$sample)
+models = list()
+for (i in 1:3){
+  XFormula = switch(i, ~1, ~x1, ~x1+x2)
+  m = Hmsc(Y = Y, XData = XData, XFormula = XFormula,
+  studyDesign = studyDesign, ranLevels = list
+  (sample = rL),distr = "probit")
+  models[[i]] = m
+}
+```
+
+```{r}
+nChains = 2
+thin = 5
+samples = 1000
+transient = 500*thin
+verbose = 500*thin
+```
+```{r}
+for (i in 1:3){
+  models[[i]] = sampleMcmc(models[[i]], thin = thin,
+  samples = samples,transient = transient,
+  nChains = nChains,verbose = verbose)
+}
+```
+
+```{r}
+mpost = convertToCodaObject(models[[3]])
+ess.beta = effectiveSize(mpost$Beta)
+psrf.beta = gelman.diag(mpost$Beta, multivariate = FALSE)$psrf
+ess.omega = effectiveSize(mpost$Omega[[1]])
+psrf.omega = gelman.diag(mpost$Omega[[1]], multivariate =FALSE)$psrf
+```
+
+Creating the histogram plots
+```{r}
+hist(ess.beta,ylab="Frequency",xlab=~paste("Effective sample size (parameter ",beta,")"),main=NULL)
+hist(psrf.beta,ylab="Frequency",xlab=~paste("Potential scale reduction factor (parameter ",beta,")"),main=NULL)
+
+hist(ess.omega,ylab="Frequency",xlab=~paste("Effective sample size (parameter ",Omega,")"),main=NULL)
+hist(psrf.omega,ylab="Frequency",xlab=~paste("Potential scale reduction factor (parameter ",Oemga,")"),main=NULL)
+```
+
+### 7.8.3 Parameter Estimates in the HMSC Models
+
+```{r}
+for (i in 1:3){
+  OmegaCor = computeAssociations(models[[i]])
+  supportLevel = 0.95
+  toPlot = ((OmegaCor[[1]]$support > supportLevel)
+            + (OmegaCor[[1]]$support < (1-supportLevel)) > 0)
+  + OmegaCor[[1]]$mean
+  corrplot(toPlot, method = "color", col = c("grey","white","black"))
+}
+```
+
+```{r}
+partition = createPartition(m, nfolds = 2, column ="sample")
+partition.sp = c(1,2,3,4,5)
+result = matrix(NA, nrow = 3, ncol = 3)
+for (i in 1:3){
+    m = models[[i]]
+    #Explanatory power
+    preds = computePredictedValues(m)
+    MF = evaluateModelFit(hM = m, predY = preds)
+    result[1,i] = mean(MF$TjurR2)
+    #Predictive power based on cross-validation
+    preds = computePredictedValues(m, partition = partition)
+    MF = evaluateModelFit(hM = m, predY = preds)
+    result[2,i] = mean(MF$TjurR2)
+    #Predictive power based on conditional cross-validation
+    preds = computePredictedValues(m, partition = partition,
+    partition.sp = partition.sp,
+    mcmcStep = 100)
+    MF = evaluateModelFit(hM = m, predY = preds)
+    result[3,i] = mean(MF$TjurR2)
+}
+```
+
