@@ -46,10 +46,8 @@ mu.B = gamma %*% t(Tr.B)
 Next applying Eq 6.7 generating species niches --> Community A residual variation s phylogenetically fully structured & Community B residual variation is fully independent among species
 ```{r}
 V2 = diag(2)
-beta.A = matrix(mvrnorm(n = 1, mu = as.vector(mu.A),
-Sigma = kronecker(C, V2)), ncol = ns)
-beta.B = matrix(mvrnorm(n = 1, mu = as.vector(mu.B),
-Sigma = kronecker(diag(ns), V2)), ncol = ns)
+beta.A = matrix(mvrnorm(n = 1, mu = as.vector(mu.A),Sigma = kronecker(C, V2)), ncol = ns)
+beta.B = matrix(mvrnorm(n = 1, mu = as.vector(mu.B),Sigma = kronecker(diag(ns), V2)), ncol = ns)
 ```
 
 ### 6.6.2 Simulating Species Data
@@ -108,8 +106,7 @@ We have named the species according to the tip labels of the phylogeny, so that 
 
 We model species occurrences as a linear function of the environmental variable $x$ (called $x$ in the dataframe XData), and species niches as a linear function of the trait covariate $t_{j2}$ (called trait in the dataframe TrData). Since our data are on species occurrences, we fit a probit model.
 ```{r}
-m = Hmsc(Y = Y, XData = XData, XFormula = ~x, TrData = TrData,
-TrFormula = ~trait, phyloTree = phy, distr = "probit")
+m = Hmsc(Y = Y, XData = XData, XFormula = ~x, TrData = TrData, TrFormula = ~trait, phyloTree = phy, distr = "probit")
 ```
 
 Model fitting
@@ -122,8 +119,7 @@ verbose = 500*thin
 ```
 ```{r}
 verbose = 0
-m = sampleMcmc(m, thin = thin, samples = samples,
-transient = transient, nChains = nChains, verbose = verbose)
+m = sampleMcmc(m, thin = thin, samples = samples, transient = transient, nChains = nChains, verbose = verbose)
 ```
 
 When performing the model fitting, we selected the sampling parameters (choices not shown, in order to keep our treatment compact) so that they lead to satisfactory MCMC convergence, as shown below for the $\rho$ parameter and in Figure 6.8 for the $\beta$ and $\gamma$ parameters.
@@ -167,16 +163,14 @@ the main focus is on modelling species niches ($\beta$ parameters) as a function
 exploring these links with ploting parameters estimated for the simulated species community --> first apply function plotBeta to visualize estimate niches
 ```{r}
 postBeta = getPostEstimate(m, parName = "Beta")
-plotBeta(m, post = postBeta, param = "Sign", plotTree = TRUE,
-supportLevel = 0.95, split = 0.4, spNamesNumbers = c(F,F))
+plotBeta(m, post = postBeta, param = "Sign", plotTree = TRUE, supportLevel = 0.95, split = 0.4, spNamesNumbers = c(F,F))
 ```
 
 
 next function plotGamma to visualize how species niches are estimated to depend on species traits
 ```{r}
 postGamma = getPostEstimate(m, parName = "Gamma")
-plotGamma(m, post = postGamma, param = "Sign",
-supportLevel = 0.95)
+plotGamma(m, post = postGamma, param = "Sign", supportLevel = 0.95)
 ```
 
 ### Variation in Species Niches: Synthesis
@@ -299,8 +293,7 @@ verbose = 500*thin
 ```
 ```{r}
 verbose = 0
-m = sampleMcmc(m, thin = thin, samples = samples,
-transient = transient, nChains = nChains, verbose = verbose)
+m = sampleMcmc(m, thin = thin, samples = samples, transient = transient, nChains = nChains, verbose = verbose)
 ```
 
 Now we evaluate the MCMC estimates for $\beta$:
@@ -334,8 +327,7 @@ These aren't bad, looks like HMSC does estimate the gamma parameters. HMSC also 
 
 ```{r}
 postGamma = getPostEstimate(m, parName = "Gamma")
-plotGamma(m, post = postGamma, param = "Support",
-supportLevel = 0.95)
+plotGamma(m, post = postGamma, param = "Support",supportLevel = 0.95)
 ```
 
 
