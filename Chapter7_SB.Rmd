@@ -1,0 +1,119 @@
+---
+title: "Chapter7_SB"
+author: "Sebastian"
+date: "`r Sys.Date()`"
+output: html_document
+knit: (function(input_file, encoding) {
+    rmarkdown::render(input_file,
+      encoding=encoding,
+      output_file= 'index.html')})
+---
+
+```{r setup, include=FALSE}
+
+```
+
+Basics of occurrence and co-occurrence:
+
+7.1. Random probit model with 2 species, 5 sites and one covariate
+
+```{r}
+x= rnorm(5,0,1)
+b1= rnorm(5,0,1)
+b2= rnorm(5,0,1)
+
+L1= x*b1
+L2= x*b2
+
+p1= 1*((L1) > 0)
+p2= 1*((L2) > 0)
+
+
+```
+
+
+7.1. Co-occurrence outcomes with propability of both species occurrence = 0.5 (50:50 for sites)
+```{r}
+p1=0.5
+p2=0.5
+
+q11= p1*p2 # co-occurence
+q00= (1-p1)*(1-p2) # both absent
+q10= p1 * (1-p2) # outcompeting species 1
+q01= (1-p1)*p2 # outcompeting species 2
+
+```
+
+7.2 Co-occurrence with competitive exclusion: 
+```{r}
+q11= 0 # co-occurence - does not happen
+q00= 0 # both absent - does not happen
+q10= 0.5 # outcompeting species 1 - in half of the sites
+q01= 0.5 # outcompeting species 2 - in half of the sites
+
+
+p1= q11 + q10 #occurrence probability of species1
+p2= q11 + q01 #occurrence probability of species2
+```
+
+
+7.3 Using latent variables
+```{r}
+#The four co occurrence outcome probabilities are constrained by q11+q00+q10+q01 = 1
+##This shows the results for two species for a particular sampling unit
+
+#independent co-occurrences (species loadings =0) and 0.5 occurrence probability due to L=0
+L1=0 # linear predictor of species 1
+L2=0 # linear predictor of species 2
+lambda1= 0 # species loading of species 1
+lambda2= 0 # species loading of species 2
+
+#higher co-occurrences than by chance (both species loadings = 1/-1) and 0.5 occurrence probability due to L=0
+L1=0 # linear predictor of species 1
+L2=0 # linear predictor of species 2
+lambda1= 1 # species loading of species 1
+lambda2= 1 # species loading of species 2
+
+#less co-occurrences than by chance (species loadings = 1 and -1) and 0.5 occurrence probability due to L=0
+L1=0 # linear predictor of species 1
+L2=0 # linear predictor of species 2
+lambda1= 1 # species loading of species 1
+lambda2= -1 # species loading of species 2
+
+#more co-occurrences than by chance (species loadings = 1) and small occurrence probability due to L= -1 (=rarer species in this sampling unit?) = positive influence of species loadings 
+L1=-1 # linear predictor of species 1
+L2=-1 # linear predictor of species 2
+lambda1= 1 # species loading of species 1
+lambda2= 1 # species loading of species 2
+
+#calculations
+cdf1= function(eta) {pnorm(L1+eta*lambda1)}
+cdf2= function(eta) {pnorm(L2+eta*lambda2)}
+curve(cdf1,-5,5,xlab="eta", col = 2)
+curve(cdf2,-5,5,xlab="eta",col = 3, add=TRUE)
+
+pdf= function(eta) {dnorm(eta)}
+plot(pdf,-5,5,xlab="eta")
+
+p1= function(eta) {(pnorm(L1+eta*lambda1)*dnorm(eta))} 
+p1c=integrate(p1, lower = -Inf, upper = Inf)
+
+p2= function(eta) {(pnorm(L2+eta*lambda2)*dnorm(eta))}
+p2c= integrate(p2, lower = -Inf, upper = Inf)
+
+q11= function(eta) {(pnorm(L1+eta*lambda1)*pnorm(L2+eta*lambda2)*dnorm(eta))}
+q11c=integrate(q11, lower = -Inf, upper = Inf)
+
+curve(p1, -5, 5,xlab="eta",col = 2)
+curve(p2, xlab="eta",col = 3, add = TRUE)
+curve(q11, xlab="eta",col = 4, add = TRUE)
+
+p1c
+p2c
+p1c$value*p2c$value
+q11c
+
+
+```
+```
+
