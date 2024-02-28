@@ -1,0 +1,70 @@
+---
+title: "Chapter 8 HMSC"
+author: "SB"
+date: "`r Sys.Date()`"
+output: html_document
+knit: (function(input_file, encoding) {
+    rmarkdown::render(input_file,
+      encoding=encoding,
+      output_file= 'index.html')})
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pander)
+library(MASS)
+library(Hmsc)
+library(RColorBrewer)
+library(lme4)
+library(mixedup)
+library(MCMCpack)
+```
+
+Samples of Linear predictors in a probit model without traits, phylogenetic data, and environmental covariates, but 100 species:
+2 models with different V and gamma values
+```{r}
+f0 = 2
+V01 = 1
+V02 = 2
+ns = 100
+gamma1 = -1
+gamma2 = -2.3
+V1 = riwish(f0, V01)
+V2 = riwish(f0, V02)
+beta1 = rnorm(n = ns, mean = gamma1, sd = sqrt(V1))
+beta2 = rnorm(n = ns, mean = gamma2, sd = sqrt(V2))
+L1 = beta1
+L2 = beta2
+p1 = pnorm(L1)
+p2 = pnorm(L2)
+par(mfrow = c(2, 2)) # Create a 2 x 2 plotting matrix
+hist(L1)
+hist(p1)
+hist(L2)
+hist(p2)
+```
+
+
+```{r}
+f0 = 3
+V0 = diag(2)
+ns = 100
+gamma = rnorm(n = 2)
+V = riwish(f0, V0)
+beta = mvrnorm(n = ns, mu = gamma, Sigma = V)
+L1 = beta %*% c(1,0)
+L2 = beta %*% c(1,1)
+L3 = beta %*% c(1,10)
+p1 = pnorm(L1)
+p2 = pnorm(L2)
+p3 = pnorm(L3)
+
+par(mfrow = c(3, 2))
+hist(L1)
+hist(p1)
+hist(L2)
+hist(p2)
+hist(L3)
+hist(p3)
+
+```
